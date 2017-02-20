@@ -84,7 +84,7 @@ function handleSetup(conn, role) {
                 key: value.key,
                 value: value.value,
                 time: value.time,
-                author: $ident.val(),
+                author:value.author,
                 fingerprint: value.fingerprint,
             });
         }).then(function() {
@@ -120,7 +120,7 @@ function handleSetup(conn, role) {
       });
       $('#cid, #c').remove();
       cinput = cinput || $('<input type="text" placeholder="message">');
-      $('#chatinputcontainter').append(cinput);
+      $('#chatinputcontainter').html(cinput);
       cinput.keyup(function(e){
         if(e.keyCode == 13 && cinput.val() && cinput.val().trim())
         {
@@ -158,11 +158,18 @@ function handleSetup(conn, role) {
 findPeers = function() {
     $.get('http'+(window.peerjskey.secure ? 's' : '')+'://'+window.peerjskey.host+(window.peerjskey.port ? (':' + window.peerjskey.port) : '')+window.peerjskey.path+window.peerjskey.key+'/peers').then(function(data){
         var knownPeers = connections.map(function(i){ return i.peer }).concat([myid]);
-        
-        data.filter(function(i){ return knownPeers.indexOf(i) === -1 }).forEach(function(i) {
+        var tmp = data.filter(function(i){ return knownPeers.indexOf(i) === -1 });
+        tmp.forEach(function(i) {
             var conn = peer.connect(i);
             handleSetup(conn, send);
         });
+        if (data.length <= 1) {
+            $('#chatinputcontainter').html('Nobody online!');
+        } else {
+            cinput = cinput || $('<input type="text" placeholder="message">');
+            $('#chatinputcontainter').html(cinput);
+        }
+        
         window.setTimeout(function() {
             findPeers();
         }, 1000);
@@ -177,6 +184,7 @@ peer.on('connection', function(conn) {
     handleSetup(conn, receiver);
 });
 
+//var cfingerprint = ( new ClientJS()).getFingerprint();
 new Fingerprint2().get(function(result, components){
   fingerprint = result;
   findPeers();
