@@ -31,7 +31,7 @@ var knowledge = {};
 function sortVisualItems() {
     $log.find('tr:not(.head)').sort(function(a,b) {
          return JSON.parse(atob($(a).data('data'))).time > JSON.parse(atob($(b).data('data'))).time;
-    }).appendTo($log)
+    }).appendTo($log);
 }
 function td(c){
     return '<td>'+c+'</td>'
@@ -39,24 +39,6 @@ function td(c){
 function draw(data) {
     return td(moment(data.time).format('llll')) + td(data.value) + td(data.author || 'annonymous') + td(data.fingerprint || 'undeteced');
 }
-
-localforage.iterate(function(value, key, iterationNumber) {
-    // Resulting key/value pair -- this callback
-    // will be executed for every item in the
-    // database.
-    if (knowledge[value.key] && knowledge[value.key].time > value.time) {
-        console.warn('Not overwriting existing entry', value, key);
-    } else {
-        $log.append($('<tr data-me="'+(fingerprint === value.fingerprint)+'" data-data="'+btoa(JSON.stringify(value))+'">'+draw(value)+'</tr>'));
-        sortVisualItems();
-        knowledge[value.key] = value;
-    }
-}).then(function() {
-    console.log('Loaded knowledge');
-}).catch(function(err) {
-    // This code runs if there were any errors
-    console.log(err);
-});
 
 peer.on('open', function(id) {
       console.log('My peer ID is: ' + id);
@@ -99,13 +81,14 @@ function handleSetup(conn, role) {
         var data = Object.assign({}, _data);
         if (data.command === commands.DATA) {
             if (!data.key || !data.value) return;
-            if (!knowledge[data.key] || knowledge[data.key].time <= data.value.time) {
+            if (!knowledge[data.key]) {
+                knowledge[data.key] = data;
                 localforage.setItem(data.key, data).then(function () {
-                     if (knowledge[key] && knowledge[key].time > data.value.time) {
-                        console.warn('Not overwriting existing entry', data.value, key);
+                     if (knowledge[data.key] && knowledge[data.key].time > data.time) {
+                        console.warn('Not overwriting existing entry', data.value, data.key);
                     } else {
-                        knowledge[key] = data.value;
-                        $log.append($('<tr data-data="'+btoa(JSON.stringify(value))+'">'+draw(data)+'</tr>'));
+                        knowledge[data.key] = data;
+                        $log.append($('<tr data-data="'+btoa(JSON.stringify(data))+'">'+draw(data)+'</tr>'));
                         sortVisualItems();
                     }
                 }).catch(function(err) {
@@ -119,8 +102,10 @@ function handleSetup(conn, role) {
         
       });
       $('#cid, #c').remove();
-      cinput = cinput || $('<input type="text" placeholder="message">');
-      $('#chatinputcontainter').html(cinput);
+      if (!cinput) {
+            cinput = $('<input type="text" placeholder="message">');
+            $('#chatinputcontainter').html(cinput);
+        }
       cinput.keyup(function(e){
         if(e.keyCode == 13 && cinput.val() && cinput.val().trim())
         {
@@ -155,6 +140,7 @@ function handleSetup(conn, role) {
     });
 }
 
+var nobodyOnline = null;
 findPeers = function() {
     $.get('http'+(window.peerjskey.secure ? 's' : '')+'://'+window.peerjskey.host+(window.peerjskey.port ? (':' + window.peerjskey.port) : '')+window.peerjskey.path+window.peerjskey.key+'/peers').then(function(data){
         var knownPeers = connections.map(function(i){ return i.peer }).concat([myid]);
@@ -165,9 +151,17 @@ findPeers = function() {
         });
         if (data.length <= 1) {
             $('#chatinputcontainter').html('Nobody online!');
+            nobodyOnline = true;
         } else {
-            cinput = cinput || $('<input type="text" placeholder="message">');
-            $('#chatinputcontainter').html(cinput);
+            if (!cinput) {
+                cinput = $('<input type="text" placeholder="message">');
+                $('#chatinputcontainter').html(cinput);
+                nobodyOnline = false;
+            }
+            if (nobodyOnline) {
+                $('#chatinputcontainter').html(cinput);
+            }
+            nobodyOnline = false;
         }
         
         window.setTimeout(function() {
@@ -184,10 +178,26 @@ peer.on('connection', function(conn) {
     handleSetup(conn, receiver);
 });
 
-//var cfingerprint = ( new ClientJS()).getFingerprint();
-new Fingerprint2().get(function(result, components){
-  fingerprint = result;
-  findPeers();
+localforage.iterate(function(value, key, iterationNumber) {
+    // Resulting key/value pair -- this callback
+    // will be executed for every item in the
+    // database.
+    if (knowledge[value.key] && knowledge[value.key].time > value.time) {
+        console.warn('Not overwriting existing entry', value, key);
+    } else {
+        $log.append($('<tr data-me="'+(fingerprint === value.fingerprint)+'" data-data="'+btoa(JSON.stringify(value))+'">'+draw(value)+'</tr>'));
+        sortVisualItems();
+        knowledge[value.key] = value;
+    }
+}).then(function() {
+    //var cfingerprint = ( new ClientJS()).getFingerprint();
+    new Fingerprint2().get(function(result, components){
+      fingerprint = result;
+      findPeers();
+    });
+}).catch(function(err) {
+    // This code runs if there were any errors
+    console.log(err);
 });
 
 
