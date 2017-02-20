@@ -1,0 +1,11 @@
+{
+  "name": "distributedcomment",
+  "version": "1.0.0",
+  "description": "A distributed system allowing commenting without saving any data on the server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jannes",
+  "license": "MIT"
+}
